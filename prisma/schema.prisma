@@ -1,0 +1,306 @@
+// Prisma Schema — EducaMarket
+// Banco: PostgreSQL
+// Doc: https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// USUÁRIO (Alunos, Criadores e Admins)
+// ─────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?   // null quando usa OAuth (Google)
+  role          UserRole  @default(ALUNO)
+  status        UserStatus @default(ACTIVE)
+  cpfCnpj       String?   // para Criadores (repasse Ipag)
+  ipagRecipientId String? // ID do criador na Ipag para split
+  especialidade String?
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relações
+  accounts      Account[]
+  sessions      Session[]
+  products      Product[]     @relation("CreatorProducts")
+  enrollments   Enrollment[]
+  transactions  Transaction[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ALUNO
+  CRIADOR
+  MODERADOR
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING_APPROVAL  // Criador aguardando validação do admin
+  BLOCKED
+}
+
+// ─────────────────────────────────────────────
+// AUTH (NextAuth.js) — tabelas obrigatórias
+// ─────────────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────
+// PRODUTO (Cursos e Aplicações)
+// ─────────────────────────────────────────────
+model Product {
+  id           String        @id @default(cuid())
+  creatorId    String
+  title        String
+  description  String        @db.Text
+  type         ProductType
+  status       ProductStatus @default(DRAFT)
+  price        Int           // em centavos (ex: 29700 = R$ 297,00)
+  coverImage   String?
+  level        String?       // ex: "Iniciante", "Avançado"
+  duration     String?       // ex: "12h 30min"
+  // Campos específicos para Aplicações
+  appVersion   String?
+  appFileUrl   String?
+  licenseType  String?
+  compatibleWith String[]    // ex: ["Revit", "AutoCAD"]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  creator      User          @relation("CreatorProducts", fields: [creatorId], references: [id])
+  modules      Module[]
+  materials    Material[]
+  enrollments  Enrollment[]
+  transactions Transaction[]
+  liveSessions LiveSession[]
+
+  @@map("products")
+}
+
+enum ProductType {
+  CURSO_GRAVADO
+  CURSO_AO_VIVO
+  CURSO_HIBRIDO
+  APP_PLUGIN
+  APP_DESKTOP
+  APP_ASSET
+  APP_TEMPLATE
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW   // enviado para aprovação do admin
+  PUBLISHED
+  UNPUBLISHED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────
+// MÓDULO (Seções de um Curso)
+// ─────────────────────────────────────────────
+model Module {
+  id        String   @id @default(cuid())
+  productId String
+  title     String
+  order     Int      // posição na sequência
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lessons   Lesson[]
+
+  @@map("modules")
+}
+
+// ─────────────────────────────────────────────
+// AULA
+// ─────────────────────────────────────────────
+model Lesson {
+  id          String   @id @default(cuid())
+  moduleId    String
+  title       String
+  order       Int
+  videoUrl    String?  // URL do vídeo hospedado (S3, Bunny, etc.)
+  duration    Int?     // duração em segundos
+  isLocked    Boolean  @default(true)  // desbloqueada após quiz anterior
+  createdAt   DateTime @default(now())
+
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  quizzes     Quiz[]
+  progress    LessonProgress[]
+
+  @@map("lessons")
+}
+
+// ─────────────────────────────────────────────
+// QUIZ (Avaliação de Progressão)
+// ─────────────────────────────────────────────
+model Quiz {
+  id          String     @id @default(cuid())
+  lessonId    String
+  question    String     @db.Text
+  options     String[]   // lista de alternativas
+  correctIndex Int       // índice da alternativa correta
+  createdAt   DateTime   @default(now())
+
+  lesson      Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("quizzes")
+}
+
+// ─────────────────────────────────────────────
+// MATERIAL DE APOIO (PDFs, PPTs, etc.)
+// ─────────────────────────────────────────────
+model Material {
+  id        String   @id @default(cuid())
+  productId String
+  name      String
+  fileUrl   String
+  fileType  String   // "pdf", "pptx", "xlsx", "dwg", etc.
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("materials")
+}
+
+// ─────────────────────────────────────────────
+// AULA AO VIVO (Google Meet)
+// ─────────────────────────────────────────────
+model LiveSession {
+  id              String   @id @default(cuid())
+  productId       String
+  title           String
+  scheduledAt     DateTime
+  durationMinutes Int      @default(60)
+  meetLink        String?  // gerado pela Google Calendar API
+  googleEventId   String?  // ID do evento no Google Calendar
+  createdAt       DateTime @default(now())
+
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("live_sessions")
+}
+
+// ─────────────────────────────────────────────
+// MATRÍCULA (Aluno inscrito num produto)
+// ─────────────────────────────────────────────
+model Enrollment {
+  id          String           @id @default(cuid())
+  userId      String
+  productId   String
+  status      EnrollmentStatus @default(ACTIVE)
+  enrolledAt  DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id])
+  product     Product          @relation(fields: [productId], references: [id])
+  progress    LessonProgress[]
+
+  @@unique([userId, productId])
+  @@map("enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  REVOKED   // estorno ou bloqueio
+  COMPLETED
+}
+
+// ─────────────────────────────────────────────
+// PROGRESSO DE AULA (por aluno)
+// ─────────────────────────────────────────────
+model LessonProgress {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  lessonId     String
+  completed    Boolean    @default(false)
+  quizPassed   Boolean    @default(false)
+  completedAt  DateTime?
+
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
+  lesson       Lesson     @relation(fields: [lessonId], references: [id])
+
+  @@unique([enrollmentId, lessonId])
+  @@map("lesson_progress")
+}
+
+// ─────────────────────────────────────────────
+// TRANSAÇÃO FINANCEIRA (registrada pelo Webhook Ipag)
+// ─────────────────────────────────────────────
+model Transaction {
+  id              String            @id @default(cuid())
+  ipagTransacaoId String            @unique
+  userId          String
+  productId       String
+  orderId         String            @unique
+  grossAmount     Int               // valor total em centavos
+  platformFee     Int               // comissão da plataforma (15%)
+  creatorAmount   Int               // repasse ao criador (85%)
+  method          String            // 'credit' | 'pix' | 'boleto'
+  status          TransactionStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id])
+  product         Product           @relation(fields: [productId], references: [id])
+
+  @@map("transactions")
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REFUNDED
+  CANCELED
+}

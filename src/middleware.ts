@@ -1,64 +1,47 @@
+import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 
 /**
- * MIDDLEWARE DE AUTENTICAÇÃO E CONTROLE DE ACESSO POR PAPEL (ROLE)
+ * MIDDLEWARE DE AUTENTICAÇÃO (NextAuth v5)
  *
- * Este middleware roda em Edge Runtime antes de cada request.
- * Ele verifica o cookie de sessão e redireciona o usuário
- * para a rota correta caso não tenha permissão.
+ * Usa a sessão JWT do NextAuth para proteger rotas por papel (role).
  *
- * Papéis (roles) suportados:
- *  - 'aluno'       → acessa /meus-cursos e /checkout/* 
- *  - 'criador'     → acessa /painel/* (após aprovação pelo admin)
- *  - 'super_admin' → acessa /admin/*
- *
- * TODO (Fase 2): Substituir o cookie manual pelo token JWT
- * emitido pelo NextAuth.js (ou Supabase Auth).
+ * Papéis suportados:
+ *  ALUNO        → /meus-cursos, /checkout
+ *  CRIADOR      → /painel (apenas se status === ACTIVE)
+ *  MODERADOR    → /admin
+ *  SUPER_ADMIN  → /admin
  */
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
+  const role = (req.auth?.user as any)?.role as string | undefined;
 
-// Rotas protegidas e os papéis que podem acessá-las
-const protectedRoutes: Record<string, string[]> = {
-  '/admin':        ['super_admin', 'moderador'],
-  '/painel':       ['criador', 'super_admin'],
-  '/meus-cursos':  ['aluno', 'criador', 'super_admin'],
-  '/checkout':     ['aluno', 'criador'],
-};
-
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // Ler o "papel" do usuário do cookie de sessão
-  // Em produção, este cookie será um JWT assinado pelo servidor
-  const sessionRole = request.cookies.get('session_role')?.value ?? null;
-
-  // Descobrir qual grupo de rotas protegidas se aplica
-  const matchedRoute = Object.keys(protectedRoutes).find((route) =>
-    pathname.startsWith(route)
-  );
-
-  if (!matchedRoute) {
-    // Rota pública — deixa passar
-    return NextResponse.next();
+  // Rotas do Admin → apenas SUPER_ADMIN e MODERADOR
+  if (pathname.startsWith('/admin')) {
+    if (!role || !['SUPER_ADMIN', 'MODERADOR'].includes(role)) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
   }
 
-  // Sem sessão → redireciona para login
-  if (!sessionRole) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
+  // Painel do Criador → apenas CRIADOR e SUPER_ADMIN
+  if (pathname.startsWith('/painel')) {
+    if (!role || !['CRIADOR', 'SUPER_ADMIN'].includes(role)) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
   }
 
-  // Com sessão mas sem o papel correto → 403 (redireciona para home)
-  const allowedRoles = protectedRoutes[matchedRoute];
-  if (!allowedRoles.includes(sessionRole)) {
-    return NextResponse.redirect(new URL('/', request.url));
+  // Área do Aluno → qualquer usuário autenticado
+  if (pathname.startsWith('/meus-cursos') || pathname.startsWith('/checkout')) {
+    if (!req.auth) {
+      const loginUrl = new URL('/login', req.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return NextResponse.next();
-}
+});
 
-// Aplica o middleware somente nessas rotas
 export const config = {
   matcher: [
     '/admin/:path*',
