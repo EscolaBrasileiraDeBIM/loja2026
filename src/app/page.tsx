@@ -29,9 +29,9 @@ export default function Home() {
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-600">
-            <Link href="#categorias" className="hover:text-indigo-600 transition-colors">Categorias</Link>
-            <Link href="#aovivo" className="hover:text-indigo-600 transition-colors">Aulas ao Vivo</Link>
+          <nav className="hidden md:flex items-center space-x-8 text-sm font-medium border-l border-slate-200 pl-6">
+            <Link href="/" className="text-indigo-600 font-semibold">Cursos</Link>
+            <Link href="/aplicacoes" className="text-slate-500 hover:text-indigo-600 transition-colors">Aplicações & Assets</Link>
           </nav>
 
           <div className="flex items-center space-x-4">

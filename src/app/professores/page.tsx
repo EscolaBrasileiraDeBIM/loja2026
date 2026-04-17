@@ -50,7 +50,7 @@ export default function Professores() {
           </h1>
           
           <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed mt-6">
-            A infraestrutura completa para você hospedar seus cursos em vídeo, criar aulas ao vivo com Google Meet e receber pagamentos por PIX, Boleto e Cartão de Crédito (via Ipag).
+            A infraestrutura completa para você hospedar e vender seus cursos e também suas <span className="font-bold text-white">Aplicações (Plugins, Apps Desktop, Assets e Templates)</span>. Receba pagamentos por PIX, Boleto e Cartão de Crédito via Ipag.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
@@ -101,7 +101,18 @@ export default function Professores() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-white mb-3">Checkout Transparente (Ipag)</h3>
-              <p className="text-slate-400">Os alunos pagam direto na sua página por PIX, Boleto ou Cartão através de nossa integração embutida com a Ipag. Liberação imediata de acesso pós-pagamento.</p>
+              <p className="text-slate-400">Os alunos pagam direto na plataforma por PIX, Boleto ou Cartão. Split de pagamento nativo e liberação imediata de acesso pós-pagamento.</p>
+            </div>
+
+            {/* Feature 4 (Novidade) */}
+            <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-3xl hover:bg-slate-800 transition-colors">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-6 text-blue-400">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">Venda de Aplicações</h3>
+              <p className="text-slate-400">Vá além das aulas. Use a mesma plataforma e gestão para vender o download de seus Plugins de BIM/CAD, Apps para Desktop, Templates e Assets 3D.</p>
             </div>
           </div>
         </div>
