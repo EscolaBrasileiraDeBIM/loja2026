@@ -1,9 +1,15 @@
-import NextAuth from 'next-auth';
+import NextAuth, { type DefaultSession } from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+
+declare module 'next-auth' {
+  interface Session {
+    user: DefaultSession['user'] & { role?: string };
+  }
+}
 
 /**
  * CONFIGURAÇÃO NEXTAUTH v5 (Beta)
