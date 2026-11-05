@@ -14,11 +14,15 @@ import { NextResponse } from 'next/server';
  */
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const role = (req.auth?.user as any)?.role as string | undefined;
+  const role = req.auth?.user?.role;
+  const isAdminApi = pathname === '/api/admin' || pathname.startsWith('/api/admin/');
 
   // Rotas do Admin → apenas SUPER_ADMIN e MODERADOR
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin') || isAdminApi) {
     if (!role || !['SUPER_ADMIN', 'MODERADOR'].includes(role)) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: 'Acesso negado.' }, { status: req.auth ? 403 : 401 });
+      }
       return NextResponse.redirect(new URL('/login', req.url));
     }
   }
@@ -43,8 +47,10 @@ export default auth((req) => {
 });
 
 export const config = {
+  runtime: 'nodejs',
   matcher: [
     '/admin/:path*',
+    '/api/admin/:path*',
     '/painel/:path*',
     '/meus-cursos/:path*',
     '/checkout/:path*',
